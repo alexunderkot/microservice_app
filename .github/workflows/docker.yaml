@@ -2,10 +2,16 @@ name: Docker Build
 
 on:
   push:
-    branches: [ master ]
+    branches:
+      - '**'
     paths:
       - 'docker/**'
       - 'Dockerfile'
+    pull_request:
+    branches:
+      - master
+      - main
+      - develop
   workflow_dispatch:
 
 permissions:

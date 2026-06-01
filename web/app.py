@@ -1,7 +1,6 @@
-from flask import Flask, render_template_string, request
+from flask import Flask, render_template_string
 import requests
 import os
-from datetime import datetime
 
 app = Flask(__name__)
 API_URL = os.environ.get('API_URL', 'http://api:5000')
@@ -33,8 +32,10 @@ HTML = """
             max-width: 400px;
             width: 100%;
         }
-        h1 { font-size: 14px; color: #8b949e; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
-        .counter { font-size: 72px; font-weight: 700; color: #58a6ff; margin: 16px 0; }
+        h1 { font-size: 14px; color: #8b949e; margin-bottom: 8px; 
+        text-transform: uppercase; letter-spacing: 1px; }
+            .counter { font-size: 72px; font-weight: 700; 
+            color: #58a6ff; margin: 16px 0; }
         .btn {
             background: #238636;
             color: white;

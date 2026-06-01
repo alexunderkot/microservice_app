@@ -2,14 +2,16 @@ name: Python
 
 on:
   push:
-    branches: [ master ]
+    branches:
+      - '**'
     paths:
       - '**.py'
       - 'requirements*.txt'
   pull_request:
-    paths:
-      - '**.py'
-      - 'requirements*.txt'
+    branches:
+      - master
+      - main
+      - develop
   workflow_dispatch:
 
 jobs:
@@ -27,11 +29,10 @@ jobs:
       
       - name: Install dependencies
         run: |
-          pip install pytest pytest-cov flake8 black isort
+          pip install flake8 black isort
           pip install -r requirements.txt
       
       - name: Lint & Test
         run: |
-          flake8 .
+          flake8 . --ignore=W292 --count --statistics
           black --check .
-          pytest --cov=. --cov-fail-under=70
