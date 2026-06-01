@@ -5,13 +5,16 @@ on:
     branches:
       - '**'
     paths:
-      - 'docker/**'
-      - 'Dockerfile'
+      - 'api/**'
+      - 'web/**'
+      - '**/Dockerfile'
   pull_request:
     branches:
-      - master
-      - main
-      - develop
+      - '**'
+    paths:
+      - 'api/**'
+      - 'web/**'
+      - '**/Dockerfile'
   workflow_dispatch:
 
 permissions:
@@ -21,9 +24,18 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - name: api
+            context: ./api
+            dockerfile: ./api/Dockerfile
+          - name: web
+            context: ./web
+            dockerfile: ./web/Dockerfile
     
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v4
       
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -38,11 +50,13 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       
-      - name: Build and push
+      - name: Build and push ${{ matrix.service.name }}
         uses: docker/build-push-action@v6
         with:
-          context: .
-          file: ./docker/ubuntu.Dockerfile
+          context: ${{ matrix.service.context }}
+          file: ${{ matrix.service.dockerfile }}
           platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ghcr.io/learning-process/ppc-ubuntu:1.1
+          push: ${{ github.event_name == 'push' && github.ref_name == 'master' }}
+          tags: |
+            ghcr.io/${{ github.repository }}/${{ matrix.service.name }}:latest
+            ghcr.io/${{ github.repository }}/${{ matrix.service.name }}:${{ github.sha }}
