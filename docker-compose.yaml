@@ -1,0 +1,36 @@
+version: '3.8'
+services:
+  api:
+    build: ./api
+    container_name: api_cont
+    ports:
+      - "123:5000"
+    volumes:
+      - api_data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5000/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+  web:
+    build: ./web
+    container_name: web_cont
+    ports:
+      - "123:5050"
+    environment:
+      - API_URL=http://api:5000
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5050/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  api_data:
