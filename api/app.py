@@ -9,7 +9,8 @@ COUNTER_FILE = '/data/counter.json'
 
 # Prometheus-метрики
 CLICKS_TOTAL = Counter('app_clicks_total', 'Total button clicks')
-API_REQUESTS = Counter('api_requests_total', 'Total API requests', ['endpoint'])
+API_REQUESTS = Counter('api_requests_total', 
+                       'Total API requests', ['endpoint'])
 
 
 def read_data():
