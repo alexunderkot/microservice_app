@@ -125,6 +125,7 @@ def click():
 def metrics():
     return generate_latest(REGISTRY), 
     200, {'Content-Type': 'text/plain'}
+  
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5050, debug=False)
