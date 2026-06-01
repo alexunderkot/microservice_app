@@ -4,7 +4,7 @@ services:
     build: ./api
     container_name: api_cont
     ports:
-      - "123:5000"
+      - "5000:5000"
     volumes:
       - api_data:/data
     healthcheck:
@@ -18,7 +18,7 @@ services:
     build: ./web
     container_name: web_cont
     ports:
-      - "123:5050"
+      - "5050:5050"
     environment:
       - API_URL=http://api:5000
     depends_on:
