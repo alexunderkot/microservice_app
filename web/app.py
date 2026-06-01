@@ -1,6 +1,10 @@
 from flask import Flask, render_template_string
 import requests
 import os
+from prometheus_client import Counter, generate_latest, REGISTRY
+
+
+WEB_REQUESTS = Counter('web_requests_total', 'Total web requests', ['endpoint'])
 
 app = Flask(__name__)
 API_URL = os.environ.get('API_URL', 'http://api:5000')
@@ -76,6 +80,7 @@ HTML = """
 
 @app.route('/health')
 def health():
+    WEB_REQUESTS.labels(endpoint='health').inc()
     try:
         r = requests.get(f'{API_URL}/health', timeout=3)
         api_status = r.json().get('status', 'unknown')
@@ -90,6 +95,7 @@ def health():
 
 @app.route('/')
 def index():
+    WEB_REQUESTS.labels(endpoint='index').inc()
     error = None
     counter = '—'
     try:
@@ -106,12 +112,17 @@ def index():
 
 @app.route('/click', methods=['POST'])
 def click():
+    WEB_REQUESTS.labels(endpoint='click').inc()
     try:
         requests.post(f'{API_URL}/increment', timeout=5)
     except Exception:
         pass
     return '<meta http-equiv="refresh" content="0; url=/">', 302
 
+
+@app.route('/metrics')
+def metrics():
+    return generate_latest(REGISTRY), 200, {'Content-Type': 'text/plain'}
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5050, debug=False)
