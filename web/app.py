@@ -4,7 +4,8 @@ import os
 from prometheus_client import Counter, generate_latest, REGISTRY
 
 
-WEB_REQUESTS = Counter('web_requests_total', 'Total web requests', ['endpoint'])
+WEB_REQUESTS = Counter('web_requests_total', 
+                       'Total web requests', ['endpoint'])
 
 app = Flask(__name__)
 API_URL = os.environ.get('API_URL', 'http://api:5000')
@@ -122,7 +123,8 @@ def click():
 
 @app.route('/metrics')
 def metrics():
-    return generate_latest(REGISTRY), 200, {'Content-Type': 'text/plain'}
+    return generate_latest(REGISTRY), 
+    200, {'Content-Type': 'text/plain'}
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5050, debug=False)
