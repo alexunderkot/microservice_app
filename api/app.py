@@ -102,20 +102,5 @@ def history():
     data = read_data()
     return jsonify({'history': data['history'][-20:]})
 
-
-def send_log_to_elasticsearch(level, service, message, extra=None):
-    log_entry = {
-        'timestamp': datetime.now().isoformat(),
-        'level': level,
-        'service': service,
-        'message': message,
-        'extra': extra or {}
-    }
-    try:
-        es.index(index='app-logs', body=log_entry)
-    except Exception as e:
-        logger.error(f"Failed to send log to Elasticsearch: {e}")
-
-
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)

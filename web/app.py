@@ -36,14 +36,6 @@ logger = logging.getLogger(__name__)
 WEB_REQUESTS = Counter('web_requests_total', 
                        'Total web requests', ['endpoint'])
 
-es = Elasticsearch(
-    [os.environ.get('ELASTICSEARCH_URL', 'http://elasticsearch:9200')],
-    request_timeout=30
-)
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
 app = Flask(__name__)
 API_URL = os.environ.get('API_URL', 'http://api:5000')
 
