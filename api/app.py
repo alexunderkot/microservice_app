@@ -69,11 +69,11 @@ def get_counter():
 def increment():
     with tracer.start_as_current_span("increment-transaction"):
         API_REQUESTS.labels(endpoint='increment').inc()
-        
+
         # Спан для чтения данных
         with tracer.start_as_current_span("read-data"):
             data = read_data()
-        
+
         # Спан для обновления данных
         with tracer.start_as_current_span("update-data"):
             data['counter'] += 1
@@ -85,7 +85,7 @@ def increment():
             if len(data['history']) > 100:
                 data['history'] = data['history'][-100:]
             write_data(data)
-        
+
         CLICKS_TOTAL.inc()
         return jsonify({'counter': data['counter']})
 

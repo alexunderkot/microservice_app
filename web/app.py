@@ -6,8 +6,6 @@ from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-from opentelemetry.instrumentation.flask import FlaskInstrumentor
-from opentelemetry.instrumentation.requests import RequestsInstrumentor
 from opentelemetry.propagate import inject
 
 
@@ -121,7 +119,7 @@ def index():
 
         headers = {}
         inject(headers)
-        
+
         try:
             r = requests.get(f'{API_URL}/counter', timeout=5, headers=headers)
             counter = r.json()['counter']
@@ -155,21 +153,23 @@ def metrics():
 def history():
     with tracer.start_as_current_span("web-history-handler"):
         WEB_REQUESTS.labels(endpoint='history').inc()
-        
+
         headers = {}
         inject(headers)
-        
+
         try:
             r = requests.get(f'{API_URL}/history', timeout=5, headers=headers)
             history_data = r.json().get('history', [])
         except Exception as e:
+            print(f"Error fetching history: {e}")
             history_data = []
-        
+
         html = '<html><body><h1>History</h1><ul>'
         for entry in history_data:
             html += f'<li>{entry["timestamp"]}: {entry["action"]} -> {entry["value"]}</li>'
         html += '</ul><a href="/">Back</a></body></html>'
         return html
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5050, debug=False)
