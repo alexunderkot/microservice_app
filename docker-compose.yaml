@@ -7,16 +7,12 @@ services:
       - "5000:5000"
     volumes:
       - api_data:/data
-    environment:
-      - ELASTICSEARCH_URL=http://elasticsearch:9200
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:5000/health"]
       interval: 3s
       timeout: 3s
       retries: 5
       start_period: 10s
-    networks:
-      - default
     restart: unless-stopped
 
   web:
@@ -26,8 +22,6 @@ services:
       - "5050:5050"
     environment:
       - API_URL=http://api:5000
-      - API_URL=http://api:5000
-      - ELASTICSEARCH_URL=http://elasticsearch:9200
     depends_on:
       api:
         condition: service_healthy
@@ -37,8 +31,6 @@ services:
       timeout: 3s
       retries: 5
       start_period: 10s
-    networks:
-      - default
     restart: unless-stopped
 
   prometheus:
@@ -71,23 +63,6 @@ services:
       - prometheus
     restart: unless-stopped
 
-<<<<<<< HEAD
-  jaeger:
-    image: jaegertracing/all-in-one:latest
-    container_name: jaeger
-    ports:
-      - "16686:16686"
-      - "4317:4317"
-      - "4318:4318"
-      - "6831:6831/udp"
-    environment:
-      - COLLECTOR_OTLP_ENABLED=true
-      - LOG_LEVEL=debug
-    restart: unless-stopped
-
-  elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
-=======
   alertmanager:
     image: prom/alertmanager:latest
     container_name: alertmanager
@@ -101,27 +76,10 @@ services:
 
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.13.0
->>>>>>> f57b15d (ELK added)
     container_name: elasticsearch
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
-<<<<<<< HEAD
-      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
-    volumes:
-      - elasticsearch_data:/usr/share/elasticsearch/data
-    ports:
-      - "9200:9200"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9200"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-    restart: unless-stopped
-
-  kibana:
-    image: docker.elastic.co/kibana/kibana:8.11.0
-=======
       - ES_JAVA_OPTS=-Xms512m -Xmx512m
     ports:
       - "9200:9200"
@@ -142,29 +100,12 @@ services:
 
   kibana:
     image: docker.elastic.co/kibana/kibana:8.13.0
->>>>>>> f57b15d (ELK added)
     container_name: kibana
     ports:
       - "5601:5601"
     environment:
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
     depends_on:
-<<<<<<< HEAD
-      elasticsearch:
-        condition: service_healthy
-    restart: unless-stopped
-
-  fluentd:
-    image: fluent/fluentd:latest
-    container_name: fluentd
-    volumes:
-      - ./fluentd/conf/fluent.conf:/fluentd/etc/fluent.conf
-    ports:
-      - "24224:24224"
-    depends_on:
-      elasticsearch:
-        condition: service_healthy
-=======
       - elasticsearch
     restart: unless-stopped
 
@@ -179,7 +120,6 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     depends_on:
       - logstash
->>>>>>> f57b15d (ELK added)
     restart: unless-stopped
 
   jaeger:
@@ -188,6 +128,10 @@ services:
     ports:
       - "16686:16686"
       - "6831:6831/udp"
+      - "4317:4317"
+    environment:
+      - COLLECTOR_ZIPKIN_HOST_PORT=:9411
+      - COLLECTOR_OTLP_ENABLED=true
     restart: unless-stopped
 
 volumes:
