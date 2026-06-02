@@ -7,10 +7,20 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.propagate import inject
+from elasticsearch import Elasticsearch
+import logging
 
 
 WEB_REQUESTS = Counter('web_requests_total', 
                        'Total web requests', ['endpoint'])
+
+es = Elasticsearch(
+    [os.environ.get('ELASTICSEARCH_URL', 'http://elasticsearch:9200')],
+    request_timeout=30
+)
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 API_URL = os.environ.get('API_URL', 'http://api:5000')
@@ -136,12 +146,14 @@ def index():
 def click():
     with tracer.start_as_current_span("web-click-handler"):
         WEB_REQUESTS.labels(endpoint='click').inc()
+        send_log_to_elasticsearch('info', 'web', 'Click received')
         headers = {}
         inject(headers)
         try:
             requests.post(f'{API_URL}/increment', timeout=5, headers=headers)
-        except Exception:
-            pass
+            send_log_to_elasticsearch('info', 'web', 'API increment successful')
+        except Exception as e:
+            send_log_to_elasticsearch('error', 'web', f'API call failed: {e}')
         return '<meta http-equiv="refresh" content="0; url=/">', 302
 
 
@@ -169,6 +181,19 @@ def history():
             html += f'<li>{entry["timestamp"]}: {entry["action"]} -> {entry["value"]}</li>'
         html += '</ul><a href="/">Back</a></body></html>'
         return html
+
+def send_log_to_elasticsearch(level, service, message, extra=None):
+    log_entry = {
+        'timestamp': datetime.now().isoformat(),
+        'level': level,
+        'service': service,
+        'message': message,
+        'extra': extra or {}
+    }
+    try:
+        es.index(index='app-logs', body=log_entry)
+    except Exception as e:
+        logger.error(f"Failed to send log to Elasticsearch: {e}")
 
 
 if __name__ == '__main__':
