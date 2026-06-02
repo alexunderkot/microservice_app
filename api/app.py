@@ -9,9 +9,20 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.instrumentation.flask import FlaskInstrumentor
 from opentelemetry.instrumentation.requests import RequestsInstrumentor
+from elasticsearch import Elasticsearch
+import logging
 
 app = Flask(__name__)
 COUNTER_FILE = '/data/counter.json'
+
+# elasticsearch logs
+es = Elasticsearch(
+    [os.environ.get('ELASTICSEARCH_URL', 'http://elasticsearch:9200')],
+    request_timeout=30
+)
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # jaeger
 provider = TracerProvider()
@@ -70,12 +81,14 @@ def increment():
     with tracer.start_as_current_span("increment-transaction"):
         API_REQUESTS.labels(endpoint='increment').inc()
 
+        send_log_to_elasticsearch('info', 'api', 'Increment started')
         # Спан для чтения данных
         with tracer.start_as_current_span("read-data"):
             data = read_data()
 
         # Спан для обновления данных
         with tracer.start_as_current_span("update-data"):
+            old_value = data['counter']
             data['counter'] += 1
             data['history'].append({
                 'action': 'increment',
@@ -85,6 +98,12 @@ def increment():
             if len(data['history']) > 100:
                 data['history'] = data['history'][-100:]
             write_data(data)
+            send_log_to_elasticsearch(
+                'info', 
+                'api', 
+                f'Counter incremented from {old_value} to {data["counter"]}',
+                {'old_value': old_value, 'new_value': data['counter']}
+            )
 
         CLICKS_TOTAL.inc()
         return jsonify({'counter': data['counter']})
@@ -95,6 +114,20 @@ def history():
     API_REQUESTS.labels(endpoint='history').inc()
     data = read_data()
     return jsonify({'history': data['history'][-20:]})
+
+
+def send_log_to_elasticsearch(level, service, message, extra=None):
+    log_entry = {
+        'timestamp': datetime.now().isoformat(),
+        'level': level,
+        'service': service,
+        'message': message,
+        'extra': extra or {}
+    }
+    try:
+        es.index(index='app-logs', body=log_entry)
+    except Exception as e:
+        logger.error(f"Failed to send log to Elasticsearch: {e}")
 
 
 if __name__ == '__main__':
