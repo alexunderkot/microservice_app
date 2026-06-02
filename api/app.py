@@ -3,14 +3,27 @@ from prometheus_client import Counter, generate_latest, REGISTRY
 import os
 import json
 from datetime import datetime
-from opentelemetry import trace
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-from opentelemetry.instrumentation.flask import FlaskInstrumentor
-from opentelemetry.instrumentation.requests import RequestsInstrumentor
-from elasticsearch import Elasticsearch
 import logging
+import sys
+
+# JSON-логирование
+class JSONFormatter(logging.Formatter):
+    def format(self, record):
+        log_entry = {
+            'timestamp': datetime.utcnow().isoformat(),
+            'level': record.levelname,
+            'service': 'api',
+            'message': record.getMessage(),
+            'logger': record.name,
+        }
+        if record.exc_info:
+            log_entry['exception'] = self.formatException(record.exc_info)
+        return json.dumps(log_entry)
+
+handler = logging.StreamHandler(sys.stdout)
+handler.setFormatter(JSONFormatter())
+logging.basicConfig(level=logging.INFO, handlers=[handler])
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 COUNTER_FILE = '/data/counter.json'
@@ -78,35 +91,20 @@ def get_counter():
 
 @app.route('/increment', methods=['POST'])
 def increment():
-    with tracer.start_as_current_span("increment-transaction"):
-        API_REQUESTS.labels(endpoint='increment').inc()
-
-        send_log_to_elasticsearch('info', 'api', 'Increment started')
-        # Спан для чтения данных
-        with tracer.start_as_current_span("read-data"):
-            data = read_data()
-
-        # Спан для обновления данных
-        with tracer.start_as_current_span("update-data"):
-            old_value = data['counter']
-            data['counter'] += 1
-            data['history'].append({
-                'action': 'increment',
-                'timestamp': datetime.now().isoformat(),
-                'value': data['counter']
-            })
-            if len(data['history']) > 100:
-                data['history'] = data['history'][-100:]
-            write_data(data)
-            send_log_to_elasticsearch(
-                'info', 
-                'api', 
-                f'Counter incremented from {old_value} to {data["counter"]}',
-                {'old_value': old_value, 'new_value': data['counter']}
-            )
-
-        CLICKS_TOTAL.inc()
-        return jsonify({'counter': data['counter']})
+    API_REQUESTS.labels(endpoint='increment').inc()
+    data = read_data()
+    data['counter'] += 1
+    data['history'].append({
+        'action': 'increment',
+        'timestamp': datetime.now().isoformat(),
+        'value': data['counter']
+    })
+    if len(data['history']) > 100:
+        data['history'] = data['history'][-100:]
+    write_data(data)
+    CLICKS_TOTAL.inc()
+    logger.info('Counter incremented', extra={'counter_value': data['counter']})  # <- добавили
+    return jsonify({'counter': data['counter']})
 
 
 @app.route('/history')

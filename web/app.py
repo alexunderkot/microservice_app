@@ -3,14 +3,28 @@ import requests
 import os
 from datetime import datetime
 from prometheus_client import Counter, generate_latest, REGISTRY
-from opentelemetry import trace
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-from opentelemetry.propagate import inject
-from elasticsearch import Elasticsearch
 import logging
+import sys
+from datetime import datetime
+import json
 
+class JSONFormatter(logging.Formatter):
+    def format(self, record):
+        log_entry = {
+            'timestamp': datetime.utcnow().isoformat(),
+            'level': record.levelname,
+            'service': 'web',
+            'message': record.getMessage(),
+            'logger': record.name,
+        }
+        if record.exc_info:
+            log_entry['exception'] = self.formatException(record.exc_info)
+        return json.dumps(log_entry)
+
+handler = logging.StreamHandler(sys.stdout)
+handler.setFormatter(JSONFormatter())
+logging.basicConfig(level=logging.INFO, handlers=[handler])
+logger = logging.getLogger(__name__)
 
 WEB_REQUESTS = Counter('web_requests_total', 
                        'Total web requests', ['endpoint'])
@@ -121,42 +135,35 @@ def health():
     }
 
 
-@app.route('/')
-def index():
-    with tracer.start_as_current_span("web-index-handler"):
-        WEB_REQUESTS.labels(endpoint='index').inc()
-        error = None
-        counter = '—'
-
-        headers = {}
-        inject(headers)
-
-        try:
-            r = requests.get(f'{API_URL}/counter', timeout=5, headers=headers)
-            counter = r.json()['counter']
-        except requests.exceptions.ConnectionError:
-            error = '❌ API недоступен. Проверьте, запущен ли сервис api.'
-        except requests.exceptions.Timeout:
-            error = '⏱️ API не отвечает (таймаут).'
-        except Exception as e:
-            error = f'⚠️ Ошибка: {str(e)}'
-        return render_template_string(HTML, counter=counter, error=error)
-
-
 @app.route('/click', methods=['POST'])
 def click():
-    with tracer.start_as_current_span("web-click-handler"):
-        WEB_REQUESTS.labels(endpoint='click').inc()
-        send_log_to_elasticsearch('info', 'web', 'Click received')
-        headers = {}
-        inject(headers)
-        try:
-            requests.post(f'{API_URL}/increment', timeout=5, headers=headers)
-            send_log_to_elasticsearch('info', 'web', 'API increment successful')
-        except Exception as e:
-            send_log_to_elasticsearch('error', 'web', f'API call failed: {e}')
-        return '<meta http-equiv="refresh" content="0; url=/">', 302
+    WEB_REQUESTS.labels(endpoint='click').inc()
+    try:
+        requests.post(f'{API_URL}/increment', timeout=5)
+        logger.info('Click sent to api')
+    except Exception as e:
+        logger.error('Failed to reach api', extra={'error': str(e)})
+    return '<meta http-equiv="refresh" content="0; url=/">', 302
 
+@app.route('/')
+def index():
+    WEB_REQUESTS.labels(endpoint='index').inc()
+    error = None
+    counter = '—'
+    try:
+        r = requests.get(f'{API_URL}/counter', timeout=5)
+        counter = r.json()['counter']
+        logger.info('Got counter from api', extra={'counter_value': counter})
+    except requests.exceptions.ConnectionError:
+        error = '❌ API недоступен. Проверьте, запущен ли сервис api.'
+        logger.error('API connection error')
+    except requests.exceptions.Timeout:
+        error = '⏱️ API не отвечает (таймаут).'
+        logger.error('API timeout')
+    except Exception as e:
+        error = f'⚠️ Ошибка: {str(e)}'
+        logger.error('Unexpected error', extra={'error': str(e)})
+    return render_template_string(HTML, counter=counter, error=error)
 
 @app.route('/metrics')
 def metrics():

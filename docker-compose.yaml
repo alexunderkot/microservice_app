@@ -48,6 +48,7 @@ services:
       - "9090:9090"
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus/rules:/etc/prometheus/rules
       - prometheus_data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
@@ -70,6 +71,7 @@ services:
       - prometheus
     restart: unless-stopped
 
+<<<<<<< HEAD
   jaeger:
     image: jaegertracing/all-in-one:latest
     container_name: jaeger
@@ -85,10 +87,26 @@ services:
 
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+=======
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+    restart: unless-stopped
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.0
+>>>>>>> f57b15d (ELK added)
     container_name: elasticsearch
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
+<<<<<<< HEAD
       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
     volumes:
       - elasticsearch_data:/usr/share/elasticsearch/data
@@ -103,12 +121,35 @@ services:
 
   kibana:
     image: docker.elastic.co/kibana/kibana:8.11.0
+=======
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    restart: unless-stopped
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.13.0
+    container_name: logstash
+    ports:
+      - "5044:5044"
+    volumes:
+      - ./elk/logstash/logstash.conf:/usr/share/logstash/pipeline/logstash.conf
+    depends_on:
+      - elasticsearch
+    restart: unless-stopped
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.13.0
+>>>>>>> f57b15d (ELK added)
     container_name: kibana
     ports:
       - "5601:5601"
     environment:
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
     depends_on:
+<<<<<<< HEAD
       elasticsearch:
         condition: service_healthy
     restart: unless-stopped
@@ -123,6 +164,22 @@ services:
     depends_on:
       elasticsearch:
         condition: service_healthy
+=======
+      - elasticsearch
+    restart: unless-stopped
+
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.13.0
+    container_name: filebeat
+    user: root
+    command: filebeat -e --strict.perms=false
+    volumes:
+      - ./elk/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      - logstash
+>>>>>>> f57b15d (ELK added)
     restart: unless-stopped
 
 volumes:
