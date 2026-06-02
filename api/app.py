@@ -3,9 +3,30 @@ from prometheus_client import Counter, generate_latest, REGISTRY
 import os
 import json
 from datetime import datetime
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.instrumentation.flask import FlaskInstrumentor
+from opentelemetry.instrumentation.requests import RequestsInstrumentor
 
 app = Flask(__name__)
 COUNTER_FILE = '/data/counter.json'
+
+# jaeger
+provider = TracerProvider()
+trace.set_tracer_provider(provider)
+
+otlp_endpoint = "http://jaeger:4318/v1/traces"
+exporter = OTLPSpanExporter(endpoint=otlp_endpoint)
+
+span_processor = BatchSpanProcessor(exporter)
+provider.add_span_processor(span_processor)
+
+FlaskInstrumentor().instrument_app(app)
+RequestsInstrumentor().instrument()
+
+tracer = trace.get_tracer(__name__)
 
 # Prometheus-метрики
 CLICKS_TOTAL = Counter('app_clicks_total', 'Total button clicks')
@@ -46,19 +67,27 @@ def get_counter():
 
 @app.route('/increment', methods=['POST'])
 def increment():
-    API_REQUESTS.labels(endpoint='increment').inc()
-    data = read_data()
-    data['counter'] += 1
-    data['history'].append({
-        'action': 'increment',
-        'timestamp': datetime.now().isoformat(),
-        'value': data['counter']
-    })
-    if len(data['history']) > 100:
-        data['history'] = data['history'][-100:]
-    write_data(data)
-    CLICKS_TOTAL.inc()
-    return jsonify({'counter': data['counter']})
+    with tracer.start_as_current_span("increment-transaction"):
+        API_REQUESTS.labels(endpoint='increment').inc()
+
+        # Спан для чтения данных
+        with tracer.start_as_current_span("read-data"):
+            data = read_data()
+
+        # Спан для обновления данных
+        with tracer.start_as_current_span("update-data"):
+            data['counter'] += 1
+            data['history'].append({
+                'action': 'increment',
+                'timestamp': datetime.now().isoformat(),
+                'value': data['counter']
+            })
+            if len(data['history']) > 100:
+                data['history'] = data['history'][-100:]
+            write_data(data)
+
+        CLICKS_TOTAL.inc()
+        return jsonify({'counter': data['counter']})
 
 
 @app.route('/history')
