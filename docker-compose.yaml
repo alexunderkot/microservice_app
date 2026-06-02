@@ -182,6 +182,14 @@ services:
 >>>>>>> f57b15d (ELK added)
     restart: unless-stopped
 
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: jaeger
+    ports:
+      - "16686:16686"
+      - "6831:6831/udp"
+    restart: unless-stopped
+
 volumes:
   api_data:
   prometheus_data:

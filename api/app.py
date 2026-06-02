@@ -5,6 +5,12 @@ import json
 from datetime import datetime
 import logging
 import sys
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.instrumentation.flask import FlaskInstrumentor
+from opentelemetry.sdk.resources import Resource
 
 # JSON-логирование
 class JSONFormatter(logging.Formatter):
@@ -28,29 +34,12 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 COUNTER_FILE = '/data/counter.json'
 
-# elasticsearch logs
-es = Elasticsearch(
-    [os.environ.get('ELASTICSEARCH_URL', 'http://elasticsearch:9200')],
-    request_timeout=30
-)
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-# jaeger
-provider = TracerProvider()
+otlp_exporter = OTLPSpanExporter(endpoint="http://jaeger:4317", insecure=True)
+provider = TracerProvider(resource=Resource.create({"service.name": "api"}))
+provider.add_span_processor(BatchSpanProcessor(otlp_exporter))
 trace.set_tracer_provider(provider)
 
-otlp_endpoint = "http://jaeger:4318/v1/traces"
-exporter = OTLPSpanExporter(endpoint=otlp_endpoint)
-
-span_processor = BatchSpanProcessor(exporter)
-provider.add_span_processor(span_processor)
-
 FlaskInstrumentor().instrument_app(app)
-RequestsInstrumentor().instrument()
-
-tracer = trace.get_tracer(__name__)
 
 # Prometheus-метрики
 CLICKS_TOTAL = Counter('app_clicks_total', 'Total button clicks')

@@ -1,4 +1,4 @@
-from flask import Flask, render_template_string
+from flask import Flask, render_template_string, redirect
 import requests
 import os
 from datetime import datetime
@@ -7,6 +7,13 @@ import logging
 import sys
 from datetime import datetime
 import json
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.instrumentation.flask import FlaskInstrumentor
+from opentelemetry.instrumentation.requests import RequestsInstrumentor
+from opentelemetry.sdk.resources import Resource
 
 class JSONFormatter(logging.Formatter):
     def format(self, record):
@@ -40,16 +47,13 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 API_URL = os.environ.get('API_URL', 'http://api:5000')
 
-provider = TracerProvider()
+otlp_exporter = OTLPSpanExporter(endpoint="http://jaeger:4317", insecure=True)
+provider = TracerProvider(resource=Resource.create({"service.name": "web"}))
+provider.add_span_processor(BatchSpanProcessor(otlp_exporter))
 trace.set_tracer_provider(provider)
 
-otlp_endpoint = "http://jaeger:4318/v1/traces"
-exporter = OTLPSpanExporter(endpoint=otlp_endpoint)
-
-span_processor = BatchSpanProcessor(exporter)
-provider.add_span_processor(span_processor)
-
-tracer = trace.get_tracer(__name__)
+FlaskInstrumentor().instrument_app(app)
+RequestsInstrumentor().instrument()
 
 HTML = """
 <!DOCTYPE html>
@@ -143,7 +147,7 @@ def click():
         logger.info('Click sent to api')
     except Exception as e:
         logger.error('Failed to reach api', extra={'error': str(e)})
-    return '<meta http-equiv="refresh" content="0; url=/">', 302
+    return redirect('/')
 
 @app.route('/')
 def index():
@@ -168,41 +172,6 @@ def index():
 @app.route('/metrics')
 def metrics():
     return generate_latest(REGISTRY), 200, {'Content-Type': 'text/plain'}
-
-@app.route('/history')
-def history():
-    with tracer.start_as_current_span("web-history-handler"):
-        WEB_REQUESTS.labels(endpoint='history').inc()
-
-        headers = {}
-        inject(headers)
-
-        try:
-            r = requests.get(f'{API_URL}/history', timeout=5, headers=headers)
-            history_data = r.json().get('history', [])
-        except Exception as e:
-            print(f"Error fetching history: {e}")
-            history_data = []
-
-        html = '<html><body><h1>History</h1><ul>'
-        for entry in history_data:
-            html += f'<li>{entry["timestamp"]}: {entry["action"]} -> {entry["value"]}</li>'
-        html += '</ul><a href="/">Back</a></body></html>'
-        return html
-
-def send_log_to_elasticsearch(level, service, message, extra=None):
-    log_entry = {
-        'timestamp': datetime.now().isoformat(),
-        'level': level,
-        'service': service,
-        'message': message,
-        'extra': extra or {}
-    }
-    try:
-        es.index(index='app-logs', body=log_entry)
-    except Exception as e:
-        logger.error(f"Failed to send log to Elasticsearch: {e}")
-
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5050, debug=False)
