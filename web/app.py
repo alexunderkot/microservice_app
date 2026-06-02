@@ -1,6 +1,7 @@
 from flask import Flask, render_template_string
 import requests
 import os
+from datetime import datetime
 from prometheus_client import Counter, generate_latest, REGISTRY
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider

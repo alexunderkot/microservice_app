@@ -15,7 +15,7 @@ import logging
 app = Flask(__name__)
 COUNTER_FILE = '/data/counter.json'
 
-#elasticsearch logs
+# elasticsearch logs
 es = Elasticsearch(
     [os.environ.get('ELASTICSEARCH_URL', 'http://elasticsearch:9200')],
     request_timeout=30
