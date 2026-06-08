@@ -1,6 +1,6 @@
+import os
 from flask import Flask, jsonify
 from prometheus_client import Counter, generate_latest, REGISTRY
-import os
 import json
 from datetime import datetime
 import logging
@@ -11,6 +11,7 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from opentelemetry.instrumentation.flask import FlaskInstrumentor
 from opentelemetry.sdk.resources import Resource
+import redis
 
 # JSON-логирование
 class JSONFormatter(logging.Formatter):
@@ -32,7 +33,6 @@ logging.basicConfig(level=logging.INFO, handlers=[handler])
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-COUNTER_FILE = '/data/counter.json'
 
 otlp_exporter = OTLPSpanExporter(endpoint="http://jaeger:4317", insecure=True)
 provider = TracerProvider(resource=Resource.create({"service.name": "api"}))
@@ -46,18 +46,22 @@ CLICKS_TOTAL = Counter('app_clicks_total', 'Total button clicks')
 API_REQUESTS = Counter('api_requests_total', 
                        'Total API requests', ['endpoint'])
 
+redis_client = redis.Redis(host=os.environ.get('REDIS_HOST', 'redis-service'), port=6379, decode_responses=True)
 
 def read_data():
-    if not os.path.exists(COUNTER_FILE):
-        return {'counter': 0, 'history': []}
-    with open(COUNTER_FILE, 'r') as f:
-        return json.load(f)
-
+    counter = redis_client.get('counter')
+    history = redis_client.lrange('history', -100, -1)
+    return {
+        'counter': int(counter) if counter else 0,
+        'history': [json.loads(h) for h in history]
+    }
 
 def write_data(data):
-    os.makedirs('/data', exist_ok=True)
-    with open(COUNTER_FILE, 'w') as f:
-        json.dump(data, f)
+    redis_client.set('counter', data['counter'])
+    if data['history']:
+        last = data['history'][-1]
+        redis_client.rpush('history', json.dumps(last))
+        redis_client.ltrim('history', -100, -1)
 
 
 @app.route('/metrics')

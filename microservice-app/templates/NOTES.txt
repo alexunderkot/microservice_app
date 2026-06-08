@@ -1,0 +1,7 @@
+App installed successfully!
+
+Web UI:
+  minikube service {{ .Release.Name }}-web --url
+
+Jaeger UI:
+  minikube service {{ .Release.Name }}-jaeger --url

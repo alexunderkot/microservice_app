@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-deployment
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: api
+  template:
+    metadata:
+      labels:
+        app: api
+    spec:
+      #imagePullSecrets:
+      #  - name: harbor-secret
+      containers:
+        - name: api-harbor
+          image: alexkot257/api:latest
+          ports:
+            - containerPort: 5000
+          volumeMounts:
+            - name: api-data
+              mountPath: /data
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 10
+            periodSeconds: 3
+      volumes:
+        - name: api-data
+          emptyDir: {}

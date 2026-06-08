@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-deployment
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      #imagePullSecrets:
+      #  - name: harbor-secret
+      containers:
+        - name: web-harbor
+          image: alexkot257/web:latest
+          ports:
+            - containerPort: 5050
+          env:
+            - name: API_URL
+              value: http://api-service:5000
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5050
+            initialDelaySeconds: 10
+            periodSeconds: 3

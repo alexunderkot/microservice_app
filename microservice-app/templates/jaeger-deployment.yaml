@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-jaeger
+spec:
+  replicas: {{ .Values.jaeger.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-jaeger
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-jaeger
+    spec:
+      containers:
+        - name: jaeger
+          image: "{{ .Values.jaeger.image }}:{{ .Values.jaeger.tag }}"
+          ports:
+            - containerPort: {{ .Values.jaeger.uiPort }}
+            - containerPort: {{ .Values.jaeger.otlpPort }}
+          env:
+            - name: COLLECTOR_OTLP_ENABLED
+              value: "true"

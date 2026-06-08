@@ -1,0 +1,28 @@
+api:
+  replicas: 2
+  image: alexkot257/api
+  tag: latest
+  port: 5000
+
+web:
+  replicas: 2
+  image: alexkot257/web
+  tag: latest
+  port: 5050
+  apiUrl: http://api-service:5000
+  nodePort: 30050
+
+jaeger:
+  replicas: 1
+  image: alexkot257/jaeger
+  tag: latest
+  uiPort: 16686
+  otlpPort: 4317
+
+redis:
+  replicas: 1
+  image: redis
+  tag: latest
+  port: 6379
+  storage: 1Gi
+
