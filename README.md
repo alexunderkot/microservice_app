@@ -202,6 +202,7 @@ terraform apply
 | docker | Устанавливает Docker CE, добавляет пользователей в группу docker |
 | nginx | Устанавливает nginx, настраивает reverse proxy с HTTPS (self-signed) |
 | deploy | Запускает контейнеры api, web, redis через Docker |
+| firewall | Настраивает ufw: разрешает 22, 80, 443, блокирует остальное |
 
 ```bash
 cd infra/ansible
