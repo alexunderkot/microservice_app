@@ -1,0 +1,25 @@
+- name: Create admin user
+  user:
+    name: "admin"
+    groups: "sudo"
+    shell: "/bin/bash"
+    create_home: yes
+
+- name: Allow admin sudo without password
+  lineinfile:
+    path: /etc/sudoers
+    line: "admin ALL=(ALL) NOPASSWD:ALL"
+    validate: visudo -cf %s
+  
+- name: Disable password authentication for SSH
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^PasswordAuthentication'
+    line: 'PasswordAuthentication no'
+  notify: Restart SSH
+
+- name: Create deploy user
+  user:
+    name: "deploy"
+    shell: "/bin/bash"
+    create_home: yes

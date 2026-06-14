@@ -1,0 +1,16 @@
+
+# Terraform
+terraform/.terraform/
+terraform/terraform.tfstate
+terraform/terraform.tfstate.backup
+terraform/tfplan
+
+# Ansible
+*.vault_pass
+ansible/group_vars/all/vault.yml
+ansible/*.retry
+ansible/ansible.cfg
+
+# Harbor
+*.tar.gz
+harbor/data/

@@ -1,0 +1,39 @@
+---
+- name: Create network for app
+  docker_network:
+    name: app_net
+    state: present
+
+- name: Redis deploy
+  docker_container:
+    name: redis
+    image: redis:latest
+    state: started
+    ports:
+      - 6379:6379
+    networks:
+      - name: app_net
+
+- name: Api deploy
+  docker_container:
+    name: api
+    image: alexkot257/api:latest
+    state: started
+    ports:
+      - 5000:5000
+    env:
+      REDIS_HOST: redis
+    networks:
+      - name: app_net
+
+- name: Web deploy
+  docker_container:
+    name: web
+    image: alexkot257/web:latest
+    state: started
+    ports:
+      - 5050:5050
+    env:
+      API_URL: http://api:5000
+    networks:
+      - name: app_net

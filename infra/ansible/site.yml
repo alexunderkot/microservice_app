@@ -1,0 +1,23 @@
+# --- так бы мы делали, если бы не было ролей, а чисто playbook'и
+# - import_playbook: playbooks/harbor.yml
+# - import_playbook: playbooks/k8s.yml
+# --- так бы мы делали, если бы не было ролей, а чисто playbook'и
+---
+- name: Setup Harbor
+  hosts: local
+  roles:
+    - harbor
+
+- name: Setup Kubernetes
+  hosts: local
+  roles:
+    - k8s
+
+- name: Setup VM
+  hosts: vm
+  become: yes
+  roles:
+    - users
+    - docker
+    - nginx
+    - deploy

@@ -1,0 +1,37 @@
+#SPDX-License-Identifier: MIT-0
+# tasks file for roles/k8s
+---
+#- name: Configure Kubernetes не используют в роли
+#  hosts: local не используют в роли
+#  tasks: не используют в роли
+- name: Start minikube
+  shell: minikube start --driver=docker
+
+- name: Add harbor.local to minikube hosts
+  shell: > 
+    minikube ssh "sudo sh -c 'grep -q harbor.local /etc/hosts || echo \"192.168.65.254 harbor.local\" >> /etc/hosts'"
+
+- name: Check Harbor is accessible from minikube
+  shell: minikube ssh "curl -s -o /dev/null -w '%{http_code}' http://harbor.local/v2/"
+  register: harbor_check
+  failed_when: harbor_check.stdout not in ['200', '401']
+
+- name: Delete existing harbor-secret if exists
+  shell: kubectl delete secret harbor-secret --ignore-not-found
+
+- name: Create harbor-secret
+  shell: >
+    kubectl create secret docker-registry harbor-secret
+    --docker-server=harbor.local:80
+    --docker-username=admin
+    --docker-password={{ harbor_password }}
+    --docker-email=admin@example.com
+
+- name: Deploy with Helm
+  shell: >
+    helm upgrade --install microservice-app ~/microservice_app/microservice-app
+  register: helm_result
+
+- name: Show Helm output
+  debug:
+    msg: "{{ helm_result.stdout }}"

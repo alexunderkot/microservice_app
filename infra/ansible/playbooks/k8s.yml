@@ -1,0 +1,44 @@
+---
+- name: Configure Kubernetes
+  hosts: local
+  tasks:
+    - name: Start minikube
+      shell: minikube start --driver=docker
+      register: minikube_result
+
+    - name: Add harbor.local to minikube hosts
+      #костыль из-за двойного ssh, тк minikube не постоянный сервер,
+      #в проде обычно k8s отдельнo записывают managed_node
+      #и используют lineinfile: 
+      # lineinfile:
+      #   path: /etc/hosts
+      #   line: "192.168.65.254 harbor.local"
+      #   regexp: "harbor.local"
+      #   state: present
+      shell: > 
+        minikube ssh "sudo sh -c 'grep -q harbor.local /etc/hosts || echo \"192.168.65.254 harbor.local\" >> /etc/hosts'"
+
+    - name: Check Harbor is accessible from minikube
+      shell: minikube ssh "curl -s -o /dev/null -w '%{http_code}' http://harbor.local/v2/"
+      register: harbor_check
+      failed_when: harbor_check.stdout not in ['200', '401']
+
+    - name: Delete existing harbor-secret if exists
+      shell: kubectl delete secret harbor-secret --ignore-not-found
+
+    - name: Create harbor-secret
+      shell: >
+        kubectl create secret docker-registry harbor-secret
+        --docker-server=harbor.local:80
+        --docker-username=admin
+        --docker-password={{ harbor_password }}
+        --docker-email=admin@example.com
+
+    - name: Deploy with Helm
+      shell: >
+        helm upgrade --install microservice-app ~/microservice_app/microservice-app
+      register: helm_result
+
+    - name: Show Helm output
+      debug:
+        msg: "{{ helm_result.stdout }}"

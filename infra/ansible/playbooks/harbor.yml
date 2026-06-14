@@ -1,0 +1,18 @@
+---
+- name: Start Harbor
+  hosts: local
+  tasks:
+    - name: Start Harbor via Docker Compose
+      shell: >
+        /mnt/c/Windows/System32/cmd.exe /c
+        "chcp 65001 && cd /d D:\devops-practice\microservice_app\harbor && docker compose up -d 2>nul"
+      ignore_errors: yes
+
+    - name: Wait for Harbor to be ready
+      uri:
+        url: http://172.19.210.230/v2/
+        status_code: 200, 401
+      register: harbor_health
+      retries: 10
+      delay: 5
+      until: harbor_health.status in [200, 401]
