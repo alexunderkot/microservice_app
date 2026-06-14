@@ -21,3 +21,4 @@
     - docker
     - nginx
     - deploy
+    - firewall
