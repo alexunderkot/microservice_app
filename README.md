@@ -8,6 +8,10 @@
 ![Prometheus](https://img.shields.io/badge/Prometheus-latest-E6522C?logo=prometheus&logoColor=white)
 ![Grafana](https://img.shields.io/badge/Grafana-latest-F46800?logo=grafana&logoColor=white)
 ![Jaeger](https://img.shields.io/badge/Jaeger-latest-66CFE3?logo=jaeger&logoColor=white)
+![Kubernetes](https://img.shields.io/badge/Kubernetes-minikube-326CE5?logo=kubernetes&logoColor=white)
+![Helm](https://img.shields.io/badge/Helm-chart-0F1689?logo=helm&logoColor=white)
+![Ansible](https://img.shields.io/badge/Ansible-playbook-EE0000?logo=ansible&logoColor=white)
+![Terraform](https://img.shields.io/badge/Terraform-docker-7B42BC?logo=terraform&logoColor=white)
 
 Учебный проект для практики DevOps-инструментов. Простое микросервисное приложение — кнопка с инкрементом счётчика — с полным observability-стеком: метрики, логи и трейсинг.
 
@@ -21,7 +25,7 @@
     ▼
 [web :5050]  ──────────►  [api :5000]
     │                          │
-    │                     /data/counter.json
+    │                       [Redis]
     │
     ├── метрики ──────►  [Prometheus :9090]  ──►  [Grafana :3000]
     │                         │
@@ -38,6 +42,7 @@
 |---|---|---|
 | web | 5050 | Flask-фронтенд, отображает счётчик и кнопку |
 | api | 5000 | Flask-бэкенд, хранит и инкрементирует счётчик |
+| Redis | 6379 | Хранение счётчика |
 | Prometheus | 9090 | Сбор метрик с сервисов |
 | Grafana | 3000 | Визуализация метрик |
 | Alertmanager | 9093 | Алерты (срабатывает при ≥10 нажатиях) |
@@ -131,6 +136,82 @@ web: POST /click
 
 ---
 
+## Kubernetes + Helm
+
+Приложение задеплоено в minikube через Helm chart.
+
+### Запуск
+
+```bash
+minikube start --driver=docker
+helm install myapp ./microservice-app
+```
+
+### Стек в кластере
+
+| Ресурс | Тип | Реплики |
+|---|---|---|
+| api | Deployment | 2 |
+| web | Deployment | 2 |
+| jaeger | Deployment | 1 |
+| redis | StatefulSet | 1 |
+
+### Сервисы
+
+| Сервис | Тип | Порт |
+|---|---|---|
+| myapp-api | ClusterIP | 5000 |
+| myapp-web | NodePort | 30050 |
+| myapp-jaeger | ClusterIP | 16686 |
+| myapp-redis | ClusterIP | 6379 |
+
+### Полезные команды
+
+```bash
+kubectl get pods
+kubectl get services
+kubectl logs <pod> --tail 20
+helm list
+helm upgrade myapp ./microservice-app
+helm uninstall myapp
+```
+
+---
+
+## Инфраструктура (infra/)
+
+Папка `infra/` содержит код для автоматизации развёртывания.
+
+### Terraform (infra/terraform/)
+
+Поднимает стек приложения через Docker провайдер — контейнеры api, web, redis и сеть.
+
+```bash
+cd infra/terraform
+terraform init
+terraform apply
+```
+
+### Ansible (infra/ansible/)
+
+Настраивает Linux-сервер с нуля и деплоит приложение. Роли:
+
+| Роль | Что делает |
+|---|---|
+| users | Создаёт пользователей admin и deploy, отключает вход по паролю |
+| docker | Устанавливает Docker CE, добавляет пользователей в группу docker |
+| nginx | Устанавливает nginx, настраивает reverse proxy с HTTPS (self-signed) |
+| deploy | Запускает контейнеры api, web, redis через Docker |
+
+```bash
+cd infra/ansible
+ansible-playbook site.yml --limit vm
+```
+
+После выполнения приложение доступно по HTTPS на целевом сервере.
+
+---
+
 ## Структура проекта
 
 ```
@@ -157,8 +238,15 @@ microservice_app/
 │           └── datasource.yml
 ├── alertmanager/           # Конфиг Alertmanager
 │   └── alertmanager.yml
+├── microservice-app/       # Helm chart
+│   ├── Chart.yaml
+│   ├── values.yaml
+│   └── templates/
+├── infra/                  # Инфраструктурный код
+│   ├── terraform/          # Docker провайдер
+│   └── ansible/            # Роли для настройки сервера
 ├── .github/
-│   └── workflows/          #CI
+│   └── workflows/          # CI
 │       ├── docker.yaml
 │       └── python.yaml
 └── docker-compose.yaml
@@ -169,9 +257,13 @@ microservice_app/
 ## Технологии
 
 - **Python 3.11** + **Flask 3.0** — бэкенд и фронтенд
-- **Docker Compose** — оркестрация контейнеров
+- **Redis** — хранение состояния счётчика
+- **Docker Compose** — оркестрация контейнеров локально
+- **Kubernetes (minikube)** + **Helm** — оркестрация в кластере
 - **Prometheus + Grafana** — метрики и визуализация
 - **ELK Stack 8.13** (Elasticsearch, Logstash, Kibana) + Filebeat — централизованное логирование
 - **Jaeger** + **OpenTelemetry** — распределённый трейсинг
-- **Alertmanager** — алертинг
+- **Alertmanager** — алертинг в Telegram
+- **Terraform** — инфраструктура как код (Docker провайдер)
+- **Ansible** — автоматизация настройки сервера (пользователи, Docker, nginx, деплой)
 - **GitHub Actions** — CI/CD
